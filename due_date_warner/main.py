@@ -205,6 +205,9 @@ def read_all_project_ids(client: GraphqlClient,
             })
 
         for project in result["data"]["organization"]["projectsNext"]["edges"]:
+            if project is None:
+                raise RuntimeError(
+                    "Can not retrieve project info, is the token authorized?")
             project_ids.append((
                 project["node"]["id"],
                 project["node"]["title"],

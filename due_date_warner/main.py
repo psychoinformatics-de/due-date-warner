@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import sys
 from datetime import datetime
@@ -10,6 +11,8 @@ from python_graphql_client import GraphqlClient
 
 from .query_due import query_item, query_projects
 
+
+logger = logging.getLogger(__name__)
 
 token_env_name = "GITHUB_AUTH_TOKEN"
 
@@ -240,13 +243,16 @@ def read_all_items(client: GraphqlClient,
                 node = edge["node"]
                 if node["type"] in ("ISSUE", "PULL_REQUEST"):
                     if node["content"] is None:
-                        raise RuntimeError(
+                        logger.warning(
                             f"can not read content of issue '{node['title']}' "
                             f"of project '{project[1]}' ({project[2]}), is the "
                             "token authorized?")
-                    url = node["content"]["url"]
+                        url = project[2]
+                    else:
+                        url = node["content"]["url"]
                 else:
                     url = project[2]
+
                 field_values_list = node["fieldValues"]["nodes"]
                 due_field_values_list = [
                     field_values

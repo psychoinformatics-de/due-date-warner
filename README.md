@@ -8,7 +8,7 @@ This tool will sift through all beta-projects that exist for a github organizati
 
 ```shell
 python -m venv $HOME/venv/due-date-warner
-source $HOME/venv/due-date-warner
+source $HOME/venv/due-date-warner/bin/activate
 ```
 
 2. Install the due date warning tool

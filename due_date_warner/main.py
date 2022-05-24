@@ -8,7 +8,7 @@ import colorama
 from prettytable import PrettyTable
 from python_graphql_client import GraphqlClient
 
-from query_due import query_item, query_projects
+from .query_due import query_item, query_projects
 
 
 token_env_name = "GITHUB_AUTH_TOKEN"
@@ -282,7 +282,7 @@ def read_all_items(client: GraphqlClient,
     return due_items
 
 
-def main():
+def cli():
 
     arguments = argument_parser.parse_args()
 
@@ -308,7 +308,3 @@ def main():
             due_items,
             arguments.max_days_to_check,
             arguments.html_output)
-
-
-if __name__ == '__main__':
-    main()

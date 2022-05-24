@@ -239,6 +239,11 @@ def read_all_items(client: GraphqlClient,
             for item_index, edge in enumerate(result["data"]["node"]["items"]["edges"]):
                 node = edge["node"]
                 if node["type"] in ("ISSUE", "PULL_REQUEST"):
+                    if node["content"] is None:
+                        raise RuntimeError(
+                            f"can not read content of issue '{node['title']}' "
+                            f"of project '{project[1]}' ({project[2]}), is the "
+                            "token authorized?")
                     url = node["content"]["url"]
                 else:
                     url = project[2]

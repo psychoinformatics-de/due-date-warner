@@ -9,7 +9,7 @@ import colorama
 from prettytable import PrettyTable
 from python_graphql_client import GraphqlClient
 
-from .query_due import query_item, query_projects
+from .query_due import query_due
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ default_organization = "psychoinformatics-de"
 
 # TODO: this does not seem "stable", check for a service point that
 #  translates the returned values to stati.
-github_done_statue = "98236657"
+github_done_status = "98236657"
 
 
 colorama.init()
@@ -57,7 +57,6 @@ argument_parser.add_argument(
 table_headers = [
         "Due date",
         "Project",
-        "Item",
         "Item description",
         "Item or Project URL",
         "Project URL"
@@ -89,7 +88,7 @@ def limit_string(string: str, max_length: int) -> str:
            else string
 
 
-def show_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
+def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
                 max_days_to_check: int,
                 html_output: bool
                 ) -> None:
@@ -99,7 +98,7 @@ def show_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
         show_html_result(due_items, max_days_to_check)
 
 
-def show_html_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
+def show_html_result(due_items: List[Tuple[datetime, str, str, str, str]],
                      max_days_to_check: int
                      ) -> None:
 
@@ -115,7 +114,7 @@ def show_html_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
     for entry in sorted(due_items):
         print("  <tr>")
 
-        due_time, project, item_index, item, item_url, project_url = entry
+        due_time, project, item, item_url, project_url = entry
         now = datetime.now(tz=due_time.tzinfo)
         days_left = (due_time - now).days
 
@@ -128,7 +127,6 @@ def show_html_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
 
         for index, content in enumerate([due_time.strftime("%Y-%m-%d"),
                                          project,
-                                         item_index,
                                          item,
                                          item_url,
                                          project_url]):
@@ -144,7 +142,7 @@ def show_html_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
     print("</table>")
 
 
-def show_text_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
+def show_text_result(due_items: List[Tuple[datetime, str, str, str, str]],
                      max_days_to_check: int
                      ) -> None:
 
@@ -157,7 +155,7 @@ def show_text_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
 
     for entry in sorted(due_items):
 
-        due_time, project, item_index, item, item_url, project_url = entry
+        due_time, project, item, item_url, project_url = entry
         now = datetime.now(tz=due_time.tzinfo)
         days_left = (due_time - now).days
 
@@ -168,7 +166,6 @@ def show_text_result(due_items: List[Tuple[datetime, str, int, str, str, str]],
         table.add_row([
             fg + bg + due_time.strftime("%Y-%m-%d") + reset,
             limit_string(project, 30),
-            item_index,
             limit_string(item, 40),
             item_url,
             project_url
@@ -191,107 +188,78 @@ def get_project_pagination_info(data: Dict) -> Tuple[bool, Optional[str]]:
     return process_page_info(data["data"]["organization"]["projectsNext"]["pageInfo"])
 
 
-def read_all_project_ids(client: GraphqlClient,
-                         organization: str
-                         ) -> List[Tuple[str, str, str]]:
+def process_item(item: Dict,
+                 project_title: str,
+                 project_url: str
+                 ) -> List:
 
-    project_ids = []
-    project_cursor = None
-    more_projects_to_read = True
-    while more_projects_to_read is True:
+    fields = {
+        field["projectField"]["name"]: field["value"]
+        for field in item["fieldValues"]["nodes"]
+    }
+    if fields.get("Status") == github_done_status:
+        return []
+    if "Due" not in fields:
+        return []
 
-        result = client.execute(
-            query=query_projects,
-            variables={
-                "organizationName": organization,
-                "projectCursor": project_cursor
-            })
+    due_date = datetime.fromisoformat(fields["Due"])
 
-        for project in result["data"]["organization"]["projectsNext"]["edges"]:
-            if project is None:
-                raise RuntimeError(
-                    "Can not retrieve project info, is the token authorized?")
-            project_ids.append((
-                project["node"]["id"],
-                project["node"]["title"],
-                project["node"]["url"]))
+    url = project_url
+    if item["type"] in ("ISSUE", "PULL_REQUEST"):
+        if item["content"] is not None:
+            url = item["content"]["url"]
+        else:
+            logger.warning(
+                f"can not read content of issue '{item['title']}' "
+                f"of project '{project_title}' ({project_url}), is the "
+                "token authorized?")
+    else:
+        url = project_url
 
-        more_projects_to_read, project_cursor = get_project_pagination_info(result)
-    return project_ids
+    return [(
+        due_date,
+        project_title,
+        item["title"],
+        url,
+        project_url
+    )]
 
 
-def read_all_items(client: GraphqlClient,
-                   projects: List[Tuple[str, str, str]]
-                   ) -> List[Tuple[datetime, str, int, str, str, str]]:
+def process_project(project_holder: Dict
+                    ) -> List:
+
+    if project_holder is None:
+        raise RuntimeError(
+            "Can not retrieve project info, is the token authorized?")
+    project = project_holder["node"]
+
+    title, url = project["title"], project["url"]
 
     due_items = []
-    for project in projects:
+    for item in project["items"]["edges"]:
+        due_items.extend(process_item(item["node"], title, url))
+    return due_items
 
-        # Inner loop, read project items
-        item_cursor = None
-        more_items_to_read = True
-        while more_items_to_read is True:
 
-            result = client.execute(
-                query=query_item,
-                variables={
-                    "projectId": project[0],
-                    "itemCursor": item_cursor
-                })
+def read_due_items(client: GraphqlClient,
+                   organization: str
+                   ) -> List[Tuple[datetime, str, str, str, str]]:
 
-            for item_index, edge in enumerate(result["data"]["node"]["items"]["edges"]):
-                node = edge["node"]
-                if node["type"] in ("ISSUE", "PULL_REQUEST"):
-                    if node["content"] is None:
-                        logger.warning(
-                            f"can not read content of issue '{node['title']}' "
-                            f"of project '{project[1]}' ({project[2]}), is the "
-                            "token authorized?")
-                        url = project[2]
-                    else:
-                        url = node["content"]["url"]
-                else:
-                    url = project[2]
+    project_cursor = None
+    item_cursor = None
 
-                field_values_list = node["fieldValues"]["nodes"]
-                due_field_values_list = [
-                    field_values
-                    for field_values in field_values_list
-                    if any(
-                        field_values["projectField"]["name"] == "Due"
-                        for field_values in field_values_list)]
-                if not due_field_values_list:
-                    continue
+    result = client.execute(
+        query=query_due,
+        variables={
+            "organizationName": organization,
+            "projectCursor": project_cursor,
+            "itemCursor": item_cursor
+        }
+    )
 
-                item_title = [
-                    x["value"]
-                    for x in due_field_values_list
-                    if x["projectField"]["name"] == "Title"][0]
-
-                due = [
-                    x["value"]
-                    for x in due_field_values_list
-                    if x["projectField"]["name"] == "Due"][0]
-
-                status = (
-                        [
-                            x["value"]
-                            for x in due_field_values_list
-                            if x["projectField"]["name"] == "Status"
-                        ] or [None])[0]
-
-                if status == github_done_statue:
-                    continue
-
-                due_items.append((
-                    datetime.fromisoformat(due),
-                    project[1],
-                    item_index + 1,
-                    item_title,
-                    url,
-                    project[2]))
-
-            more_items_to_read, item_cursor = get_item_pagination_info(result)
+    due_items = []
+    for project in result["data"]["organization"]["projectsNext"]["edges"]:
+        due_items.extend(process_project(project))
 
     return due_items
 
@@ -312,8 +280,7 @@ def cli():
         endpoint="https://api.github.com/graphql",
         headers={"Authorization": f"token {token}"})
 
-    projects = read_all_project_ids(client, arguments.organization)
-    due_items = read_all_items(client, projects)
+    due_items = read_due_items(client, arguments.organization)
 
     if len(due_items) == 0:
         print("No items with due times were found.")

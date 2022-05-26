@@ -9,7 +9,7 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
                 node {
                     title
                     url
-                    items(first: 2, after: $itemCursor) {
+                    items(first: 100, after: $itemCursor) {
                         edges {
                             cursor
                             node {
@@ -23,11 +23,15 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
                                     }
                                 }
                                 type
-                                fieldValues(first: 20) {
+                                fieldValues(first: 48) {
                                     nodes {
                                         projectField {name} 
                                         value
                                     } 
+                                    pageInfo {
+                                        endCursor
+                                        hasNextPage
+                                    }
                                 }
                             }
                         }
@@ -41,68 +45,6 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
             pageInfo {
                 endCursor
                 hasNextPage
-            }
-            totalCount
-        }
-    }
-}
-"""
-
-
-query_projects = """
-query projects($organizationName: String!, $projectCursor: String) {
-    organization(login: $organizationName) {
-        projectsNext(first: 100, after: $projectCursor) {
-            edges {
-                cursor
-                node {
-                    id
-                    title
-                    url
-                }
-            }
-            pageInfo {
-                endCursor
-                hasNextPage
-            }
-        }
-    }
-}
-"""
-
-
-query_item = """
-query item($projectId: ID!, $itemCursor: String) {
-    node(id: $projectId) {
-        ... on ProjectNext {
-            items(first: 100, after: $itemCursor) {
-                edges {
-                    cursor
-                    node {
-                        title
-                        content {
-                            ... on Issue {
-                                url
-                            }
-                            ... on PullRequest {
-                                url
-                            }
-                        }
-                        type
-                        fieldValues(first: 100) {
-                            nodes {
-                                projectField {
-                                    name
-                                }
-                                value
-                            } 
-                        }
-                    }
-                }
-                pageInfo {
-                    endCursor
-                    hasNextPage
-                }
             }
         }
     }

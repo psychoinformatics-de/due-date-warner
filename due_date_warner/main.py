@@ -9,7 +9,7 @@ import colorama
 from prettytable import PrettyTable
 from python_graphql_client import GraphqlClient
 
-from .query_due import query_due
+from .query_due import query_due, query_field_values
 
 
 logger = logging.getLogger(__name__)
@@ -188,15 +188,43 @@ def get_project_pagination_info(data: Dict) -> Tuple[bool, Optional[str]]:
     return process_page_info(data["data"]["organization"]["projectsNext"]["pageInfo"])
 
 
-def process_item(item: Dict,
+def item_field_values_to_dict(item: Dict) -> Dict:
+    return {
+        edge["node"]["projectField"]["name"]: edge["node"]["value"]
+        for edge in item["fieldValues"]["edges"]
+    }
+
+
+def process_item(client: GraphqlClient,
+                 item: Dict,
                  project_title: str,
                  project_url: str
                  ) -> List:
 
-    fields = {
-        field["projectField"]["name"]: field["value"]
-        for field in item["fieldValues"]["nodes"]
-    }
+    # Transform item fieldValues collection to a dictionary
+    fields = item_field_values_to_dict(item)
+
+    # Ensure all fields are fetched
+    more_field_values_available = item["fieldValues"]["pageInfo"]["hasNextPage"]
+    while more_field_values_available:
+        additional_field_values = client.execute(
+            query=query_field_values,
+            variables={
+                "itemId": item["id"],
+                "endCursor": item["fieldValues"]["pageInfo"]["endCursor"]
+            }
+        )
+
+        #import json
+        #print(json.dumps(additional_field_values, indent=4))
+
+        item = additional_field_values["data"]["node"]
+        fields = {
+            **fields,
+            **item_field_values_to_dict(item)
+        }
+        more_field_values_available = item["fieldValues"]["pageInfo"]["hasNextPage"]
+
     if fields.get("Status") == github_done_status:
         return []
     if "Due" not in fields:
@@ -225,7 +253,8 @@ def process_item(item: Dict,
     )]
 
 
-def process_project(project_holder: Dict
+def process_project(client: GraphqlClient,
+                    project_holder: Dict
                     ) -> List:
 
     if project_holder is None:
@@ -237,7 +266,7 @@ def process_project(project_holder: Dict
 
     due_items = []
     for item in project["items"]["edges"]:
-        due_items.extend(process_item(item["node"], title, url))
+        due_items.extend(process_item(client, item["node"], title, url))
     return due_items
 
 
@@ -257,9 +286,12 @@ def read_due_items(client: GraphqlClient,
         }
     )
 
+    #import json
+    #print(json.dumps(result, indent=4))
+
     due_items = []
     for project in result["data"]["organization"]["projectsNext"]["edges"]:
-        due_items.extend(process_project(project))
+        due_items.extend(process_project(client, project))
 
     return due_items
 

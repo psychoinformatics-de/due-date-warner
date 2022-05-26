@@ -13,6 +13,7 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
                         edges {
                             cursor
                             node {
+                                id
                                 title
                                 content {
                                     ... on Issue {
@@ -24,10 +25,13 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
                                 }
                                 type
                                 fieldValues(first: 48) {
-                                    nodes {
-                                        projectField {name} 
-                                        value
-                                    } 
+                                    edges {
+                                        cursor
+                                        node {
+                                            projectField {name} 
+                                            value
+                                        } 
+                                    }
                                     pageInfo {
                                         endCursor
                                         hasNextPage
@@ -45,6 +49,30 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
             pageInfo {
                 endCursor
                 hasNextPage
+            }
+        }
+    }
+}
+"""
+
+
+query_field_values = """
+query next_field($itemId: ID!, $endCursor: String!) {
+    node(id: $itemId) {
+        ... on ProjectNextItem {
+            id
+            fieldValues(first: 100, after: $endCursor) {
+                edges {
+                    cursor
+                    node {
+                        projectField {name} 
+                        value
+                    } 
+                }
+                pageInfo {
+                    endCursor
+                    hasNextPage
+                }
             }
         }
     }

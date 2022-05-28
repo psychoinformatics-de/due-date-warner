@@ -9,7 +9,7 @@ import colorama
 from prettytable import PrettyTable
 from python_graphql_client import GraphqlClient
 
-from .query_due import query_due, query_field_values
+from .query_due import query_due, query_field_values, query_item_values
 
 
 logger = logging.getLogger(__name__)
@@ -205,8 +205,7 @@ def process_item(client: GraphqlClient,
     fields = item_field_values_to_dict(item)
 
     # Ensure all fields are fetched
-    more_field_values_available = item["fieldValues"]["pageInfo"]["hasNextPage"]
-    while more_field_values_available:
+    while item["fieldValues"]["pageInfo"]["hasNextPage"]:
         additional_field_values = client.execute(
             query=query_field_values,
             variables={
@@ -215,15 +214,11 @@ def process_item(client: GraphqlClient,
             }
         )
 
-        #import json
-        #print(json.dumps(additional_field_values, indent=4))
-
         item = additional_field_values["data"]["node"]
         fields = {
             **fields,
             **item_field_values_to_dict(item)
         }
-        more_field_values_available = item["fieldValues"]["pageInfo"]["hasNextPage"]
 
     if fields.get("Status") == github_done_status:
         return []
@@ -264,6 +259,20 @@ def process_project(client: GraphqlClient,
 
     title, url = project["title"], project["url"]
 
+    # Ensure all item are loaded
+    items = project["items"]
+    while items["pageInfo"]["hasNextPage"]:
+        end_cursor = items["pageInfo"]["endCursor"]
+        additional_items = client.execute(
+            query=query_item_values,
+            variables={
+                "projectNextId": project["id"],
+                "endCursor": end_cursor
+            }
+        )
+        items = additional_items["data"]["node"]["items"]
+        project["items"]["edges"].extend(items["edges"])
+
     due_items = []
     for item in project["items"]["edges"]:
         due_items.extend(process_item(client, item["node"], title, url))
@@ -285,9 +294,6 @@ def read_due_items(client: GraphqlClient,
             "itemCursor": item_cursor
         }
     )
-
-    #import json
-    #print(json.dumps(result, indent=4))
 
     due_items = []
     for project in result["data"]["organization"]["projectsNext"]["edges"]:

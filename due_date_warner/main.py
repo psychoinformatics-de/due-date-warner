@@ -3,10 +3,9 @@ import logging
 import os
 import sys
 from datetime import datetime
+from importlib import import_module
 from typing import Dict, List, Optional, Tuple
 
-import colorama
-from prettytable import PrettyTable
 from python_graphql_client import GraphqlClient
 
 from .query_due import query_due, query_field_values, query_item_values, \
@@ -22,9 +21,6 @@ default_organization = "psychoinformatics-de"
 # TODO: this does not seem "stable", check for a service point that
 #  translates the returned values to stati.
 github_done_status = "98236657"
-
-
-colorama.init()
 
 
 argument_parser = argparse.ArgumentParser(
@@ -47,132 +43,43 @@ argument_parser.add_argument(
          "will be listed. (default: 60)"
 )
 
+
 argument_parser.add_argument(
-    "--html-output",
-    action="store_true",
-    default=False,
-    help="Emit an html table"
+    "--renderer",
+    type=str,
+    default="console",
+    help="Choose the renderer for the resulting table. The renderer is a module"
+         "in the package due_date_warner.renderer, which implements a method"
+         "called 'show_result', e.g. use '--renderer=html' to use the module"
+         "html.py for rendering"
 )
 
 
-table_headers = [
-        "Due date",
-        "Project",
-        "Item description",
-        "Item or Project URL",
-        "Project URL"
-]
+argument_parser.add_argument(
+    "--days-urgent",
+    type=int,
+    default=14,
+    help="Number of days from today for which the "
+         "output will be marked 'urgent'"
+)
 
 
-colorama_to_html = {
-    colorama.Fore.BLACK: "black",
-    colorama.Back.RED: "red",
-    colorama.Fore.RED: "red",
-    colorama.Fore.YELLOW: "yellow",
-    colorama.Fore.GREEN: "green",
-}
+argument_parser.add_argument(
+    "--days-soon",
+    type=int,
+    default=14,
+    help="Number of days from today + 'urgent' days for which the "
+         "output will be marked 'soon', i.e. yellow"
+)
 
 
-def get_date_color(days_left: int) -> Tuple[str, str]:
-    if days_left < 0:
-        return colorama.Fore.BLACK, colorama.Back.RED
-    if days_left <= 14:
-        return colorama.Fore.RED, ""
-    if days_left <= 30:
-        return colorama.Fore.YELLOW, ""
-    return colorama.Fore.GREEN, ""
-
-
-def limit_string(string: str, max_length: int) -> str:
-    return string[:max_length - 3] + "..." \
-           if len(string) >= max_length \
-           else string
-
-
-def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
-                max_days_to_check: int,
-                html_output: bool
+def show_result(renderer: str,
+                due_items: List[Tuple[datetime, str, str, str, str]],
+                urgent_days: int = 14,
+                soon_days: int = 30,
                 ) -> None:
-    if html_output is False:
-        show_text_result(due_items, max_days_to_check)
-    else:
-        show_html_result(due_items, max_days_to_check)
-
-
-def show_html_result(due_items: List[Tuple[datetime, str, str, str, str]],
-                     max_days_to_check: int
-                     ) -> None:
-
-    def print_cell(content: str, tag: str = "td"):
-        print(f"    <{tag}>{content}</{tag}>")
-
-    print("<table>")
-    print("  <tr>")
-    for header in table_headers:
-        print_cell(header, "th")
-    print("  </tr>")
-
-    for entry in sorted(due_items):
-        print("  <tr>")
-
-        due_time, project, item, item_url, project_url = entry
-        now = datetime.now(tz=due_time.tzinfo)
-        days_left = (due_time - now).days
-
-        if max_days_to_check < days_left:
-            continue
-
-        fg, bg = get_date_color(days_left)
-        if bg:
-            fg = colorama.Fore.RED
-
-        for index, content in enumerate([due_time.strftime("%Y-%m-%d"),
-                                         project,
-                                         item,
-                                         item_url,
-                                         project_url]):
-            if index == 0:
-                if days_left < 0:
-                    content = "**" + content + "**"
-                print(f'   <td><font color="{colorama_to_html[fg]}">{content}</font></td>')
-            else:
-                print_cell(content)
-
-        print("  </tr>")
-
-    print("</table>")
-
-
-def show_text_result(due_items: List[Tuple[datetime, str, str, str, str]],
-                     max_days_to_check: int
-                     ) -> None:
-
-    reset = colorama.Style.RESET_ALL
-    table = PrettyTable()
-    table.field_names = table_headers
-
-    table.align = "l"
-    table.align["Item"] = "r"
-
-    for entry in sorted(due_items):
-
-        due_time, project, item, item_url, project_url = entry
-        now = datetime.now(tz=due_time.tzinfo)
-        days_left = (due_time - now).days
-
-        if max_days_to_check < days_left:
-            continue
-
-        fg, bg = get_date_color(days_left)
-        table.add_row([
-            fg + bg + due_time.strftime("%Y-%m-%d") + reset,
-            limit_string(project, 30),
-            limit_string(item, 40),
-            item_url,
-            project_url
-        ])
-
-    print(table)
+    render_module = import_module(f"due_date_warner.renderer.{renderer}")
+    render_module.show_result(due_items, urgent_days, soon_days)
 
 
 def process_page_info(page_info: Dict) -> Tuple[bool, Optional[str]]:
@@ -197,6 +104,7 @@ def item_field_values_to_dict(item: Dict) -> Dict:
 
 
 def process_item(client: GraphqlClient,
+                 max_days: int,
                  item: Dict,
                  project_title: str,
                  project_url: str
@@ -227,6 +135,10 @@ def process_item(client: GraphqlClient,
         return []
 
     due_date = datetime.fromisoformat(fields["Due"])
+    now = datetime.now(tz=due_date.tzinfo)
+    days_left = (due_date - now).days
+    if days_left > max_days:
+        return []
 
     url = project_url
     if item["type"] in ("ISSUE", "PULL_REQUEST"):
@@ -250,7 +162,8 @@ def process_item(client: GraphqlClient,
 
 
 def process_project(client: GraphqlClient,
-                    project_holder: Dict
+                    project_holder: Dict,
+                    max_days: int
                     ) -> List:
 
     if project_holder is None:
@@ -276,12 +189,14 @@ def process_project(client: GraphqlClient,
 
     due_items = []
     for item in project["items"]["edges"]:
-        due_items.extend(process_item(client, item["node"], title, url))
+        due_items.extend(
+            process_item(client, max_days, item["node"], title, url))
     return due_items
 
 
 def read_due_items(client: GraphqlClient,
-                   organization: str
+                   organization: str,
+                   max_days: int
                    ) -> List[Tuple[datetime, str, str, str, str]]:
 
     project_cursor = None
@@ -300,7 +215,7 @@ def read_due_items(client: GraphqlClient,
     organization_id = result["data"]["organization"]["id"]
     projects_next = result["data"]["organization"]["projectsNext"]
     for project in projects_next["edges"]:
-        due_items.extend(process_project(client, project))
+        due_items.extend(process_project(client, project, max_days))
 
     while projects_next["pageInfo"]["hasNextPage"]:
         end_cursor = projects_next["pageInfo"]["endCursor"]
@@ -314,7 +229,7 @@ def read_due_items(client: GraphqlClient,
         organization_id = result["data"]["node"]["id"]
         projects_next = result["data"]["node"]["projectsNext"]
         for project in projects_next["edges"]:
-            due_items.extend(process_project(client, project))
+            due_items.extend(process_project(client, project, max_days))
 
     return due_items
 
@@ -335,12 +250,18 @@ def cli():
         endpoint="https://api.github.com/graphql",
         headers={"Authorization": f"token {token}"})
 
-    due_items = read_due_items(client, arguments.organization)
+    due_items = read_due_items(
+        client,
+        arguments.organization,
+        arguments.max_days_to_check)
 
     if len(due_items) == 0:
-        print("No items with due times were found.")
+        print(
+            f"No items with due times with the next "
+            f"{arguments.max_days_to_check} were found.")
     else:
         show_result(
+            arguments.renderer,
             due_items,
-            arguments.max_days_to_check,
-            arguments.html_output)
+            arguments.days_urgent,
+            arguments.days_soon)

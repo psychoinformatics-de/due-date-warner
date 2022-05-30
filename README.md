@@ -1,6 +1,6 @@
 # Due Date Warning Tool
 
-This tool will sift through all beta-projects that exist for a github organization, look for all items with a due-date and prints a table of the items that are due within a given number of days (by default: 60). The output can either be colored text or HTML (the supported HTML version is HTML 4 in order to be able to use the tool's output with the `/html` command in Matrix).
+This tool will sift through all beta-projects that exist for a github organization, look for all items with a due-date, i.e. a value field with name "Due" and type "Date", and print a table of the items that are due within a given number of days (by default: 60). The output can either be colored text or HTML (the supported HTML version is HTML 4 in order to be able to use the tool's output with the `/html` command in Matrix).
 
 ## Installation:
 

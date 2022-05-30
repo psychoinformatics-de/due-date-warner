@@ -9,7 +9,8 @@ import colorama
 from prettytable import PrettyTable
 from python_graphql_client import GraphqlClient
 
-from .query_due import query_due, query_field_values, query_item_values
+from .query_due import query_due, query_field_values, query_item_values, \
+    query_projects
 
 
 logger = logging.getLogger(__name__)
@@ -209,7 +210,7 @@ def process_item(client: GraphqlClient,
         additional_field_values = client.execute(
             query=query_field_values,
             variables={
-                "itemId": item["id"],
+                "nodeId": item["id"],
                 "endCursor": item["fieldValues"]["pageInfo"]["endCursor"]
             }
         )
@@ -266,7 +267,7 @@ def process_project(client: GraphqlClient,
         additional_items = client.execute(
             query=query_item_values,
             variables={
-                "projectNextId": project["id"],
+                "nodeId": project["id"],
                 "endCursor": end_cursor
             }
         )
@@ -296,8 +297,24 @@ def read_due_items(client: GraphqlClient,
     )
 
     due_items = []
-    for project in result["data"]["organization"]["projectsNext"]["edges"]:
+    organization_id = result["data"]["organization"]["id"]
+    projects_next = result["data"]["organization"]["projectsNext"]
+    for project in projects_next["edges"]:
         due_items.extend(process_project(client, project))
+
+    while projects_next["pageInfo"]["hasNextPage"]:
+        end_cursor = projects_next["pageInfo"]["endCursor"]
+        result = client.execute(
+            query=query_projects,
+            variables={
+                "nodeId": organization_id,
+                "endCursor": end_cursor
+            }
+        )
+        organization_id = result["data"]["node"]["id"]
+        projects_next = result["data"]["node"]["projectsNext"]
+        for project in projects_next["edges"]:
+            due_items.extend(process_project(client, project))
 
     return due_items
 

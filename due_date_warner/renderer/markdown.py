@@ -20,6 +20,8 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
         if category in (DayCategory.over_due, DayCategory.urgent):
             date_string = "**" + date_string + "**"
 
+        if item_url:
+            item = "[" + item + "](" + item_url + ")"
         print(
             date_string + " --- *" + item + "* - [" + project + "](" +
             project_url + ")  ")

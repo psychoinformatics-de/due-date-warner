@@ -2,7 +2,14 @@ from datetime import datetime
 from typing import List, Tuple
 
 
-from . import DayCategory, get_date_category, table_headers
+from . import DayCategory, get_date_category
+
+
+html_table_headers = [
+    "Due date",
+    "Item",
+    "Project",
+]
 
 
 category_to_html = {
@@ -11,6 +18,12 @@ category_to_html = {
     DayCategory.soon: "yellow",
     DayCategory.later: "green",
 }
+
+
+def anchor(name: str,
+           url: str
+           ) -> str:
+    return f'<a href="{url}">{name}</a>'
 
 
 def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
@@ -23,7 +36,7 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
 
     print("<table>")
     print("  <tr>")
-    for header in table_headers:
+    for header in html_table_headers:
         print_cell(header, "th")
     print("  </tr>")
 
@@ -38,9 +51,8 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
         print(
             f'   <td><font color="{category_to_html[category]}">'
             f'{due_time.strftime("%Y-%m-%d")}</font></td>')
-
-        for content in [project, item, item_url, project_url]:
-            print_cell(content)
-
+        print_cell(anchor(item, item_url) if item_url else item)
+        print_cell(anchor(project, project_url))
         print("  </tr>")
+
     print("</table>")

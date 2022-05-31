@@ -21,7 +21,7 @@ pip install .
 
 ## Usage
 
-You need to provide a github authorization token that is authorized to read the projects of the organization that the due-date-warner should examine. The github authorization token has to be provided in the environment variable `GITHUB_AUTH_TOKEN`. For example, if your github authorization token is `ghp_als3mnmnsdf44sdfsdfmndsfsdfhehusdfZ`, you can use the following command to set the environment variable:
+You need to provide a github authorization token that is authorized to read the projects of the organization that the due-date-warner should examine. The github authorization token has to be provided in the environment variable `GITHUB_AUTH_TOKEN`. For example, if your github authorization token is `ghp_als3mnmnsdf44sdfsdfmndsfsdfhehusdfZ`. The token must have minimally the scope `read.org` in order to access projects. If links to issue-items or PR-items in private projects should be inserted into the output, the scope `repo` must also be set (otherwise you might get a warning when the due-date-warner tries to resolve a link into a private repository). You can use the following command to set the environment variable:
 
 ```
 export GITHUB_AUTH_TOKEN="ghp_als3mnmnsdf44sdfsdfmndsfsdfhehusdfZ4"

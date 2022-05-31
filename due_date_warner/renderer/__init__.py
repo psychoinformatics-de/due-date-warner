@@ -1,15 +1,6 @@
 from enum import Enum
 
 
-table_headers = [
-    "Due date",
-    "Project",
-    "Item description",
-    "Item or Project URL",
-    "Project URL"
-]
-
-
 class DayCategory(Enum):
     over_due = 0
     urgent = 1

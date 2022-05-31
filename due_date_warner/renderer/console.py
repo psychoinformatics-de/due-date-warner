@@ -4,10 +4,18 @@ from typing import List, Tuple
 import colorama
 from prettytable import PrettyTable
 
-from . import DayCategory, get_date_category, table_headers
+from . import DayCategory, get_date_category
 
 
 colorama.init()
+
+
+console_table_headers = [
+    "Due date",
+    "Item description",
+    "Project name",
+    "Project URL"
+]
 
 
 category_to_colorama = {
@@ -19,7 +27,7 @@ category_to_colorama = {
 
 
 def limit_string(string: str, max_length: int) -> str:
-    return string[:max_length - 3] + "..." \
+    return string[:max_length - 4] + " ..." \
            if len(string) >= max_length \
            else string
 
@@ -31,7 +39,7 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
 
     reset = colorama.Style.RESET_ALL
     table = PrettyTable()
-    table.field_names = table_headers
+    table.field_names = console_table_headers
 
     table.align = "l"
     table.align["Item"] = "r"
@@ -47,9 +55,8 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
 
         table.add_row([
             fg + bg + due_time.strftime("%Y-%m-%d") + reset,
-            limit_string(project, 30),
             limit_string(item, 40),
-            item_url,
+            limit_string(project, 40),
             project_url
         ])
 

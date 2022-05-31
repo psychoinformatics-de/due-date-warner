@@ -65,7 +65,6 @@ query next_fields($nodeId: ID!, $endCursor: String!) {
             id
             fieldValues(first: 100, after: $endCursor) {
                 edges {
-                    cursor
                     node {
                         projectField {name} 
                         value
@@ -91,7 +90,6 @@ query next_items($nodeId: ID!, $endCursor: String!) {
             url
             items(first: 100, after: $endCursor) {
                 edges {
-                    cursor
                     node {
                         id
                         title
@@ -106,7 +104,6 @@ query next_items($nodeId: ID!, $endCursor: String!) {
                         type
                         fieldValues(first: 100) {
                             edges {
-                                cursor
                                 node {
                                     projectField {name} 
                                     value
@@ -137,14 +134,12 @@ query next_project($nodeId: ID!, $endCursor: String) {
             id
             projectsNext(first: 100, after: $endCursor) {
                 edges {
-                    cursor
                     node {
                         id
                         title
                         url
                         items(first: 100) {
                             edges {
-                                cursor
                                 node {
                                     id
                                     title
@@ -159,7 +154,6 @@ query next_project($nodeId: ID!, $endCursor: String) {
                                     type
                                     fieldValues(first: 48) {
                                         edges {
-                                            cursor
                                             node {
                                                 projectField {name} 
                                                 value

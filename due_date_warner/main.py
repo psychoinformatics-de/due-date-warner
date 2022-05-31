@@ -47,25 +47,25 @@ argument_parser.add_argument(
     "--renderer",
     type=str,
     default="console",
-    help="Choose the renderer for the resulting table. The renderer is a module"
+    help="Choose the renderer for the resulting list. The renderer is a module"
          "in the package due_date_warner.renderer, which implements a method"
          "called 'show_result', e.g. use '--renderer=html' to use the module"
          "html.py for rendering. Currently three renderer are supported: "
-         "'console', 'markup', and 'html'.")
+         "'console', 'markup', and 'html'. (default: 'console')")
 
 argument_parser.add_argument(
     "--days-urgent",
     type=int,
     default=14,
     help="Number of days from today for which the "
-         "output will be marked 'urgent'")
+         "output will be marked 'urgent'. (default: 14)")
 
 argument_parser.add_argument(
     "--days-soon",
     type=int,
     default=14,
     help="Number of days from today + 'urgent' days for which the "
-         "output will be marked 'soon', i.e. yellow")
+         "output will be marked 'soon', i.e. yellow. (default: 14)")
 
 argument_parser.add_argument(
     "--html-output",
@@ -120,26 +120,6 @@ def process_query(client: GraphqlClient,
     return result
 
 
-def get_all(initial: Dict,
-            client: GraphqlClient,
-            query: str,
-            element_key: str
-            ) -> Iterator:
-
-    yield from initial
-    outer = initial
-    while outer[element_key]["pageInfo"]["hasNextPage"]:
-        more_data = process_query(
-            client,
-            query,
-            {
-                "nodeId": outer["id"],
-                "endCursor": outer[element_key]["pageInfo"]["endCursor"]
-            })
-        outer = more_data["data"]["node"]
-        yield from outer
-
-
 def process_item(client: GraphqlClient,
                  max_days: int,
                  item: Dict,
@@ -187,7 +167,8 @@ def process_item(client: GraphqlClient,
                 f"can not read content of issue '{item['title']}' "
                 f"of project '{project_title}' ({project_url}). Maybe the token"
                 " is not authorized to access the linked issue or PR? That"
-                " might be the case of the project is private.")
+                " might be the case if the linked project is private, and your"
+                " token does not have the scope 'repo'")
     else:
         url = project_url
 

@@ -36,7 +36,7 @@ It will print out a table with all project items that have a due date, are not d
 There are a few options to modify different settings, e.g.:
 
  - `--max-days-to-check`:  change the numbers of days that are checked for due dates, i.e. if a due date is further in the future than --max-days-to-check, it will not be reported. Default is 60, i.e. two months
- - `--renderer`: specify the renderer that should be used. There are currently three renderer: "consolr" (the default), "html", and "markdown". Markdown is probably the leanest rendered content since it uses a single line per due-date report, the other two use tables to output the result.
+ - `--renderer`: specify the renderer that should be used. There are currently three renderer: "console" (the default), "html", and "markdown". Markdown is probably the leanest rendered content since it uses a single line per due-date report, the other two use tables to output the result.
  - `--days-urgent` specifies the numbers of days that are rendered in "urgent"-style, e.g. bold or in red color. The default is 14.
  - `--days-soon` specifies the numbers of days after urgent that are rendered in "soon"-style, e.g. in yellow color. The default is 14. That means that the days from "urgent" + 1 until "urgent" + 14 are rendered in "soon"-style.
 

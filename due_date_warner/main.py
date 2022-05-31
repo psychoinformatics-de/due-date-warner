@@ -2,9 +2,10 @@ import argparse
 import logging
 import os
 import sys
+from collections import defaultdict
 from datetime import datetime
 from importlib import import_module
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from python_graphql_client import GraphqlClient
 
@@ -40,34 +41,31 @@ argument_parser.add_argument(
     type=int,
     default=60,
     help="Define the maximum number of days in the future for which due dates "
-         "will be listed. (default: 60)"
-)
+         "will be listed. (default: 60)")
 
 argument_parser.add_argument(
     "--renderer",
     type=str,
     default="console",
-    help="Choose the renderer for the resulting table. The renderer is a module"
+    help="Choose the renderer for the resulting list. The renderer is a module"
          "in the package due_date_warner.renderer, which implements a method"
          "called 'show_result', e.g. use '--renderer=html' to use the module"
-         "html.py for rendering"
-)
+         "html.py for rendering. Currently three renderer are supported: "
+         "'console', 'markup', and 'html'. (default: 'console')")
 
 argument_parser.add_argument(
     "--days-urgent",
     type=int,
     default=14,
     help="Number of days from today for which the "
-         "output will be marked 'urgent'"
-)
+         "output will be marked 'urgent'. (default: 14)")
 
 argument_parser.add_argument(
     "--days-soon",
     type=int,
     default=14,
     help="Number of days from today + 'urgent' days for which the "
-         "output will be marked 'soon', i.e. yellow"
-)
+         "output will be marked 'soon', i.e. yellow. (default: 14)")
 
 argument_parser.add_argument(
     "--html-output",
@@ -75,8 +73,7 @@ argument_parser.add_argument(
     default=False,
     help="Emit an html table. This argument exists for backward compatibility, "
          "it takes precedence over renderer via '--renderer'. Instead of this "
-         "parameter you should use '--renderer=html'."
-)
+         "parameter you should use '--renderer=html'.")
 
 
 def show_result(renderer: str,
@@ -88,18 +85,19 @@ def show_result(renderer: str,
     render_module.show_result(due_items, urgent_days, soon_days)
 
 
-def process_page_info(page_info: Dict) -> Tuple[bool, Optional[str]]:
-    if page_info["hasNextPage"] is False:
-        return False, None
-    return True, page_info["endCursor"]
+def process_error(result: Dict):
+    errors = result.get("errors")
+    if not errors:
+        return
 
+    error_types = defaultdict(set)
+    for error in errors:
+        error_types[error["type"]].add(error["message"])
 
-def get_item_pagination_info(data: Dict) -> Tuple[bool, Optional[str]]:
-    return process_page_info(data["data"]["node"]["items"]["pageInfo"])
-
-
-def get_project_pagination_info(data: Dict) -> Tuple[bool, Optional[str]]:
-    return process_page_info(data["data"]["organization"]["projectsNext"]["pageInfo"])
+    raise ValueError(
+        "\n".join(
+            f"{e_type}: {message}"
+            for e_type, message in error_types.items()))
 
 
 def item_field_values_to_dict(item: Dict) -> Dict:
@@ -107,6 +105,19 @@ def item_field_values_to_dict(item: Dict) -> Dict:
         edge["node"]["projectField"]["name"]: edge["node"]["value"]
         for edge in item["fieldValues"]["edges"]
     }
+
+
+def process_query(client: GraphqlClient,
+                  query: str,
+                  variables: Optional[Dict] = None
+                  ) -> Dict:
+
+    result = client.execute(
+        query=query,
+        variables=variables or {}
+    )
+    process_error(result)
+    return result
 
 
 def process_item(client: GraphqlClient,
@@ -121,9 +132,10 @@ def process_item(client: GraphqlClient,
 
     # Ensure all fields are fetched
     while item["fieldValues"]["pageInfo"]["hasNextPage"]:
-        additional_field_values = client.execute(
-            query=query_field_values,
-            variables={
+        additional_field_values = process_query(
+            client,
+            query_field_values,
+            {
                 "nodeId": item["id"],
                 "endCursor": item["fieldValues"]["pageInfo"]["endCursor"]
             }
@@ -153,8 +165,10 @@ def process_item(client: GraphqlClient,
         else:
             logger.warning(
                 f"can not read content of issue '{item['title']}' "
-                f"of project '{project_title}' ({project_url}), is the "
-                "token authorized?")
+                f"of project '{project_title}' ({project_url}). Maybe the token"
+                " is not authorized to access the linked issue or PR? That"
+                " might be the case if the linked project is private, and your"
+                " token does not have the scope 'repo'")
     else:
         url = project_url
 
@@ -183,9 +197,10 @@ def process_project(client: GraphqlClient,
     items = project["items"]
     while items["pageInfo"]["hasNextPage"]:
         end_cursor = items["pageInfo"]["endCursor"]
-        additional_items = client.execute(
-            query=query_item_values,
-            variables={
+        additional_items = process_query(
+            client,
+            query_item_values,
+            {
                 "nodeId": project["id"],
                 "endCursor": end_cursor
             }
@@ -208,9 +223,10 @@ def read_due_items(client: GraphqlClient,
     project_cursor = None
     item_cursor = None
 
-    result = client.execute(
-        query=query_due,
-        variables={
+    result = process_query(
+        client,
+        query_due,
+        {
             "organizationName": organization,
             "projectCursor": project_cursor,
             "itemCursor": item_cursor
@@ -225,13 +241,15 @@ def read_due_items(client: GraphqlClient,
 
     while projects_next["pageInfo"]["hasNextPage"]:
         end_cursor = projects_next["pageInfo"]["endCursor"]
-        result = client.execute(
-            query=query_projects,
-            variables={
+        result = process_query(
+            client,
+            query_projects,
+            {
                 "nodeId": organization_id,
                 "endCursor": end_cursor
             }
         )
+
         organization_id = result["data"]["node"]["id"]
         projects_next = result["data"]["node"]["projectsNext"]
         for project in projects_next["edges"]:
@@ -264,7 +282,7 @@ def cli():
     if len(due_items) == 0:
         print(
             f"No items with due times with the next "
-            f"{arguments.max_days_to_check} were found.")
+            f"{arguments.max_days_to_check} days were found.")
     else:
         show_result(
             arguments.renderer if arguments.html_output is False else "html",

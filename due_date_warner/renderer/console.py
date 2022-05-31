@@ -12,9 +12,8 @@ colorama.init()
 
 console_table_headers = [
     "Due date",
-    "Item description",
-    "Project name",
-    "Project URL"
+    "Item",
+    "Project",
 ]
 
 
@@ -27,6 +26,8 @@ category_to_colorama = {
 
 
 def limit_string(string: str, max_length: int) -> str:
+    if len(string) < max_length:
+        return string + (" " * (max_length - len(string)))
     return string[:max_length - 4] + " ..." \
            if len(string) >= max_length \
            else string
@@ -42,8 +43,6 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
     table.field_names = console_table_headers
 
     table.align = "l"
-    table.align["Item"] = "r"
-
     for entry in sorted(due_items):
 
         due_time, project, item, item_url, project_url = entry
@@ -55,9 +54,8 @@ def show_result(due_items: List[Tuple[datetime, str, str, str, str]],
 
         table.add_row([
             fg + bg + due_time.strftime("%Y-%m-%d") + reset,
-            limit_string(item, 40),
-            limit_string(project, 40),
-            project_url
+            limit_string(item, 40) + " (" + item_url + ")" if item_url else item,
+            limit_string(project, 40) + " (" + project_url + ")"
         ])
 
     print(table)

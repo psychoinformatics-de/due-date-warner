@@ -43,7 +43,6 @@ argument_parser.add_argument(
          "will be listed. (default: 60)"
 )
 
-
 argument_parser.add_argument(
     "--renderer",
     type=str,
@@ -54,7 +53,6 @@ argument_parser.add_argument(
          "html.py for rendering"
 )
 
-
 argument_parser.add_argument(
     "--days-urgent",
     type=int,
@@ -63,13 +61,21 @@ argument_parser.add_argument(
          "output will be marked 'urgent'"
 )
 
-
 argument_parser.add_argument(
     "--days-soon",
     type=int,
     default=14,
     help="Number of days from today + 'urgent' days for which the "
          "output will be marked 'soon', i.e. yellow"
+)
+
+argument_parser.add_argument(
+    "--html-output",
+    action="store_true",
+    default=False,
+    help="Emit an html table. This argument exists for backward compatibility, "
+         "it takes precedence over renderer via '--renderer'. Instead of this "
+         "parameter you should use '--renderer=html'."
 )
 
 
@@ -261,7 +267,7 @@ def cli():
             f"{arguments.max_days_to_check} were found.")
     else:
         show_result(
-            arguments.renderer,
+            arguments.renderer if arguments.html_output is False else "html",
             due_items,
             arguments.days_urgent,
             arguments.days_soon)

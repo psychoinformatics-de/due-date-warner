@@ -6,14 +6,12 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
         id
         projectsNext(first: 100, after: $projectCursor) {
             edges {
-                cursor
                 node {
                     id
                     title
                     url
                     items(first: 100, after: $itemCursor) {
                         edges {
-                            cursor
                             node {
                                 id
                                 title
@@ -28,7 +26,6 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
                                 type
                                 fieldValues(first: 48) {
                                     edges {
-                                        cursor
                                         node {
                                             projectField {name} 
                                             value

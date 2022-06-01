@@ -5,7 +5,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from importlib import import_module
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from python_graphql_client import GraphqlClient
 
@@ -100,13 +100,6 @@ def process_error(result: Dict):
             for e_type, message in error_types.items()))
 
 
-def item_field_values_to_dict(item: Dict) -> Dict:
-    return {
-        edge["node"]["projectField"]["name"]: edge["node"]["value"]
-        for edge in item["fieldValues"]["edges"]
-    }
-
-
 def process_query(client: GraphqlClient,
                   query: str,
                   variables: Optional[Dict] = None
@@ -114,10 +107,31 @@ def process_query(client: GraphqlClient,
 
     result = client.execute(
         query=query,
-        variables=variables or {}
-    )
+        variables=variables or {})
+
     process_error(result)
     return result
+
+
+def get_all(initial_node: Dict,
+            client: GraphqlClient,
+            query: str,
+            element_key: str
+            ) -> Iterable:
+
+    yield from initial_node[element_key]["edges"]
+
+    node = initial_node
+    while node[element_key]["pageInfo"]["hasNextPage"]:
+        more_data = process_query(
+            client,
+            query,
+            {
+                "nodeId": node["id"],
+                "endCursor": node[element_key]["pageInfo"]["endCursor"]})
+
+        node = more_data["data"]["node"]
+        yield from node[element_key]["edges"]
 
 
 def process_item(client: GraphqlClient,
@@ -125,38 +139,22 @@ def process_item(client: GraphqlClient,
                  item: Dict,
                  project_title: str,
                  project_url: str
-                 ) -> List:
+                 ) -> Iterable:
 
-    # Transform item fieldValues collection to a dictionary
-    fields = item_field_values_to_dict(item)
+    field_values = {
+        field["node"]["projectField"]["name"]: field["node"]["value"]
+        for field in get_all(item, client, query_field_values, "fieldValues")}
 
-    # Ensure all fields are fetched
-    while item["fieldValues"]["pageInfo"]["hasNextPage"]:
-        additional_field_values = process_query(
-            client,
-            query_field_values,
-            {
-                "nodeId": item["id"],
-                "endCursor": item["fieldValues"]["pageInfo"]["endCursor"]
-            }
-        )
+    if field_values.get("Status") == github_done_status:
+        return
+    if "Due" not in field_values:
+        return
 
-        item = additional_field_values["data"]["node"]
-        fields = {
-            **fields,
-            **item_field_values_to_dict(item)
-        }
-
-    if fields.get("Status") == github_done_status:
-        return []
-    if "Due" not in fields:
-        return []
-
-    due_date = datetime.fromisoformat(fields["Due"])
+    due_date = datetime.fromisoformat(field_values["Due"])
     now = datetime.now(tz=due_date.tzinfo)
     days_left = (due_date - now).days
     if days_left > max_days:
-        return []
+        return
 
     url = project_url
     if item["type"] in ("ISSUE", "PULL_REQUEST"):
@@ -172,90 +170,33 @@ def process_item(client: GraphqlClient,
     else:
         url = project_url
 
-    return [(
-        due_date,
-        project_title,
-        item["title"],
-        url,
-        project_url
-    )]
+    yield due_date, project_title, item["title"], url, project_url
 
 
 def process_project(client: GraphqlClient,
                     project_holder: Dict,
                     max_days: int
-                    ) -> List:
+                    ) -> Iterable:
 
     if project_holder is None:
         raise RuntimeError(
             "Can not retrieve project info, is the token authorized?")
+
     project = project_holder["node"]
-
     title, url = project["title"], project["url"]
-
-    # Ensure all item are loaded
-    items = project["items"]
-    while items["pageInfo"]["hasNextPage"]:
-        end_cursor = items["pageInfo"]["endCursor"]
-        additional_items = process_query(
-            client,
-            query_item_values,
-            {
-                "nodeId": project["id"],
-                "endCursor": end_cursor
-            }
-        )
-        items = additional_items["data"]["node"]["items"]
-        project["items"]["edges"].extend(items["edges"])
-
-    due_items = []
-    for item in project["items"]["edges"]:
-        due_items.extend(
-            process_item(client, max_days, item["node"], title, url))
-    return due_items
+    for item in get_all(project, client, query_item_values, "items"):
+        yield from process_item(client, max_days, item["node"], title, url)
 
 
 def read_due_items(client: GraphqlClient,
                    organization: str,
                    max_days: int
-                   ) -> List[Tuple[datetime, str, str, str, str]]:
+                   ) -> Iterable[Tuple[datetime, str, str, str, str]]:
 
-    project_cursor = None
-    item_cursor = None
-
-    result = process_query(
-        client,
-        query_due,
-        {
-            "organizationName": organization,
-            "projectCursor": project_cursor,
-            "itemCursor": item_cursor
-        }
-    )
-
-    due_items = []
-    organization_id = result["data"]["organization"]["id"]
-    projects_next = result["data"]["organization"]["projectsNext"]
-    for project in projects_next["edges"]:
-        due_items.extend(process_project(client, project, max_days))
-
-    while projects_next["pageInfo"]["hasNextPage"]:
-        end_cursor = projects_next["pageInfo"]["endCursor"]
-        result = process_query(
-            client,
-            query_projects,
-            {
-                "nodeId": organization_id,
-                "endCursor": end_cursor
-            }
-        )
-
-        organization_id = result["data"]["node"]["id"]
-        projects_next = result["data"]["node"]["projectsNext"]
-        for project in projects_next["edges"]:
-            due_items.extend(process_project(client, project, max_days))
-
-    return due_items
+    result = process_query(client, query_due, {"organizationName": organization})
+    project_holder = result["data"]["organization"]
+    for project_next in get_all(project_holder, client, query_projects, "projectsNext"):
+        yield from process_project(client, project_next, max_days)
 
 
 def cli():
@@ -274,10 +215,11 @@ def cli():
         endpoint="https://api.github.com/graphql",
         headers={"Authorization": f"token {token}"})
 
-    due_items = read_due_items(
-        client,
-        arguments.organization,
-        arguments.max_days_to_check)
+    due_items = list(
+        read_due_items(
+            client,
+            arguments.organization,
+            arguments.max_days_to_check))
 
     if len(due_items) == 0:
         print(

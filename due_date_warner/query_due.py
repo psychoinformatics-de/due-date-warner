@@ -1,19 +1,17 @@
 
 
 query_due = """
-query due_items($organizationName: String!, $projectCursor: String, $itemCursor: String) {
+query due_items($organizationName: String!) {
     organization(login: $organizationName) {
         id
-        projectsNext(first: 100, after: $projectCursor) {
+        projectsNext(first: 100) {
             edges {
-                cursor
                 node {
                     id
                     title
                     url
-                    items(first: 100, after: $itemCursor) {
+                    items(first: 100) {
                         edges {
-                            cursor
                             node {
                                 id
                                 title
@@ -28,7 +26,6 @@ query due_items($organizationName: String!, $projectCursor: String, $itemCursor:
                                 type
                                 fieldValues(first: 48) {
                                     edges {
-                                        cursor
                                         node {
                                             projectField {name} 
                                             value

@@ -216,17 +216,10 @@ def read_due_items(client: GraphqlClient,
                    max_days: int
                    ) -> Iterable[Tuple[datetime, str, str, str, str]]:
 
-    project_cursor = None
-    item_cursor = None
-
     result = process_query(
         client,
         query_due,
-        {
-            "organizationName": organization,
-            "projectCursor": project_cursor,
-            "itemCursor": item_cursor
-        }
+        {"organizationName": organization}
     )
 
     organization_id = result["data"]["organization"]["id"]

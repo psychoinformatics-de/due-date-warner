@@ -1,4 +1,36 @@
 
+project_template = """
+node {
+    id
+    type
+    content {
+        ... on Issue {
+            value: url
+        }
+        ... on PullRequest {
+            value: url
+        }
+    }
+    Title: fieldValueByName(name: "Title") {
+        ... on ProjectV2ItemFieldTextValue {
+            value: text
+        }
+    }
+    Due: fieldValueByName(name: "Due") {
+        ... on ProjectV2ItemFieldDateValue {
+            value: date
+        }
+    }
+    Status: fieldValueByName(name: "Status") {
+        ... on ProjectV2ItemFieldSingleSelectValue {
+            value: optionId
+        }
+    }
+}
+"""
+
+
+
 
 query_due = """
 query due_items($organizationName: String!) {
@@ -12,33 +44,7 @@ query due_items($organizationName: String!) {
                     url
                     items(first:100) {
                         edges {
-                            node {
-                                id
-                                type
-                                content {
-                                    ... on Issue {
-                                        value: url
-                                    }
-                                    ... on PullRequest {
-                                        value: url
-                                    }
-                                }
-                                Title: fieldValueByName(name: "Title") {
-                                    ... on ProjectV2ItemFieldTextValue {
-                                        value: text
-                                    }
-                                }
-                                Due: fieldValueByName(name: "Due") {
-                                    ... on ProjectV2ItemFieldDateValue {
-                                        value: date
-                                    }
-                                }
-                                Status: fieldValueByName(name: "Status") {
-                                    ... on ProjectV2ItemFieldSingleSelectValue {
-                                        value: optionId
-                                    }
-                                }
-                            }
+                            %s
                         }
                         pageInfo {
                             endCursor
@@ -54,7 +60,8 @@ query due_items($organizationName: String!) {
         }
     }
 }
-"""
+""" % project_template
+
 
 query_item_values = """
 query next_items($nodeId: ID!, $endCursor: String!) {
@@ -65,33 +72,7 @@ query next_items($nodeId: ID!, $endCursor: String!) {
             url
             items(first:100 after: $endCursor) {
                 edges {
-                    node {
-                        id
-                        type
-                        content {
-                            ... on Issue {
-                                Url: url
-                            }
-                            ... on PullRequest {
-                                Url: url
-                            }
-                        }
-                        Title: fieldValueByName(name: "Title") {
-                            ... on ProjectV2ItemFieldTextValue {
-                                value: text
-                            }
-                        }
-                        Due: fieldValueByName(name: "Due") {
-                            ... on ProjectV2ItemFieldDateValue {
-                                value: date
-                            }
-                        }
-                        Status: fieldValueByName(name: "Status") {
-                            ... on ProjectV2ItemFieldSingleSelectValue {
-                                value: optionId
-                            }
-                        }
-                    }
+                    %s
                 }
                 pageInfo {
                     endCursor
@@ -100,7 +81,7 @@ query next_items($nodeId: ID!, $endCursor: String!) {
             }
     }
 }
-"""
+""" % project_template
 
 
 query_projects = """
@@ -110,46 +91,7 @@ query next_project($nodeId: ID!, $endCursor: String) {
             id
             projectsV2(first: 100, after: $endCursor) {
                 edges {
-                    node {
-                        id
-                        title
-                        url
-                        items(first:100) {
-                            edges {
-                                node {
-                                    id
-                                    type
-                                    content {
-                                        ... on Issue {
-                                            Url: url
-                                        }
-                                        ... on PullRequest {
-                                            Url: url
-                                        }
-                                    }
-                                    Title: fieldValueByName(name: "Title") {
-                                        ... on ProjectV2ItemFieldTextValue {
-                                            value: text
-                                        }
-                                    }
-                                    Due: fieldValueByName(name: "Due") {
-                                        ... on ProjectV2ItemFieldDateValue {
-                                            value: date
-                                        }
-                                    }
-                                    Status: fieldValueByName(name: "Status") {
-                                        ... on ProjectV2ItemFieldSingleSelectValue {
-                                            value: optionId
-                                        }
-                                    }
-                                }
-                            }
-                            pageInfo {
-                                endCursor
-                                hasNextPage
-                            }
-                        }
-                    }
+                    %s
                 }
                 pageInfo {
                     endCursor
@@ -159,4 +101,4 @@ query next_project($nodeId: ID!, $endCursor: String) {
         }
     }
 }
-"""
+""" % project_template

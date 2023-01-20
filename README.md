@@ -21,17 +21,17 @@ pip install .
 
 ## Usage
 
-You need to provide a github authorization token that is authorized to read the projects of the organization that the due-date-warner should examine. The github authorization token has to be provided in the environment variable `GITHUB_AUTH_TOKEN`. For example, if your github authorization token is `ghp_als3mnmnsdf44sdfsdfmndsfsdfhehusdfZ`. The token must have minimally the scope `read.org` in order to access projects. If links to issue-items or PR-items in private projects should be inserted into the output, the scope `repo` must also be set (otherwise you might get a warning when the due-date-warner tries to resolve a link into a private repository). You can use the following command to set the environment variable:
+You need to provide a github authorization token that is authorized to read the projects of the organization that the due-date-warner should examine. The github authorization token has to be provided in the environment variable `GITHUB_AUTH_TOKEN`. For example, if your github authorization token is `ghp_als3mnmnsdf44sdfsdfmndsfsdfhehusdfZ`. The token must have minimally the scope `read:org` and `read:project` in order to access projects. If links to issue-items or PR-items in private projects should be inserted into the output, the scope `repo` must also be set (otherwise you might get a warning when the due-date-warner tries to resolve a link into a private repository). You can use the following command to set the environment variable:
 
 ```
 export GITHUB_AUTH_TOKEN="ghp_als3mnmnsdf44sdfsdfmndsfsdfhehusdfZ4"
 ```
 
-By default the due-date-warner will search through the beta-project of the organization `psychoinformatics-de`. Provide your own organization in the command line. 
+By default, the due-date-warner will search through the projects of the organization `psychoinformatics-de`. Provide your own organization in the command line. 
 ```shell
 ddw psychoinformatics-de
 ```
-It will print out a table with all project items that have a due date, are not done and within the next 60 days.
+It will print out a table with all project items that have a due date that lies within the next 60 days and are not done.
 
 There are a few options to modify different settings, e.g.:
 
@@ -41,4 +41,3 @@ There are a few options to modify different settings, e.g.:
  - `--days-soon` specifies the numbers of days after urgent that are rendered in "soon"-style, e.g. in yellow color. The default is 14. That means that the days from "urgent" + 1 until "urgent" + 14 are rendered in "soon"-style.
 
 See `ddw --help` for a description of all parameter.
-

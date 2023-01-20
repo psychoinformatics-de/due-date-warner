@@ -4,36 +4,38 @@ query_due = """
 query due_items($organizationName: String!) {
     organization(login: $organizationName) {
         id
-        projectsNext(first: 100) {
+        projectsV2(first: 100) {
             edges {
                 node {
                     id
                     title
                     url
-                    items(first: 100) {
+                    items(first:100) {
                         edges {
                             node {
                                 id
-                                title
+                                type
                                 content {
                                     ... on Issue {
-                                        url
+                                        value: url
                                     }
                                     ... on PullRequest {
-                                        url
+                                        value: url
                                     }
                                 }
-                                type
-                                fieldValues(first: 48) {
-                                    edges {
-                                        node {
-                                            projectField {name} 
-                                            value
-                                        } 
+                                Title: fieldValueByName(name: "Title") {
+                                    ... on ProjectV2ItemFieldTextValue {
+                                        value: text
                                     }
-                                    pageInfo {
-                                        endCursor
-                                        hasNextPage
+                                }
+                                Due: fieldValueByName(name: "Due") {
+                                    ... on ProjectV2ItemFieldDateValue {
+                                        value: date
+                                    }
+                                }
+                                Status: fieldValueByName(name: "Status") {
+                                    ... on ProjectV2ItemFieldSingleSelectValue {
+                                        value: optionId
                                     }
                                 }
                             }
@@ -54,61 +56,39 @@ query due_items($organizationName: String!) {
 }
 """
 
-
-query_field_values = """
-query next_fields($nodeId: ID!, $endCursor: String!) {
-    node(id: $nodeId) {
-        ... on ProjectNextItem {
-            id
-            fieldValues(first: 100, after: $endCursor) {
-                edges {
-                    node {
-                        projectField {name} 
-                        value
-                    } 
-                }
-                pageInfo {
-                    endCursor
-                    hasNextPage
-                }
-            }
-        }
-    }
-}
-"""
-
-
 query_item_values = """
 query next_items($nodeId: ID!, $endCursor: String!) {
     node(id: $nodeId) {
-        ... on ProjectNext {
+        ... on ProjectsV2 {
             id
             title
             url
-            items(first: 100, after: $endCursor) {
+            items(first:100 after: $endCursor) {
                 edges {
                     node {
                         id
-                        title
+                        type
                         content {
                             ... on Issue {
-                                url
+                                Url: url
                             }
                             ... on PullRequest {
-                                url
+                                Url: url
                             }
                         }
-                        type
-                        fieldValues(first: 100) {
-                            edges {
-                                node {
-                                    projectField {name} 
-                                    value
-                                } 
+                        Title: fieldValueByName(name: "Title") {
+                            ... on ProjectV2ItemFieldTextValue {
+                                value: text
                             }
-                            pageInfo {
-                                endCursor
-                                hasNextPage
+                        }
+                        Due: fieldValueByName(name: "Due") {
+                            ... on ProjectV2ItemFieldDateValue {
+                                value: date
+                            }
+                        }
+                        Status: fieldValueByName(name: "Status") {
+                            ... on ProjectV2ItemFieldSingleSelectValue {
+                                value: optionId
                             }
                         }
                     }
@@ -118,7 +98,6 @@ query next_items($nodeId: ID!, $endCursor: String!) {
                     hasNextPage
                 }
             }
-        }
     }
 }
 """
@@ -129,36 +108,38 @@ query next_project($nodeId: ID!, $endCursor: String) {
     node(id: $nodeId) {
         ... on Organization {
             id
-            projectsNext(first: 100, after: $endCursor) {
+            projectsV2(first: 100, after: $endCursor) {
                 edges {
                     node {
                         id
                         title
                         url
-                        items(first: 100) {
+                        items(first:100) {
                             edges {
                                 node {
                                     id
-                                    title
+                                    type
                                     content {
                                         ... on Issue {
-                                            url
+                                            Url: url
                                         }
                                         ... on PullRequest {
-                                            url
+                                            Url: url
                                         }
                                     }
-                                    type
-                                    fieldValues(first: 48) {
-                                        edges {
-                                            node {
-                                                projectField {name} 
-                                                value
-                                            } 
+                                    Title: fieldValueByName(name: "Title") {
+                                        ... on ProjectV2ItemFieldTextValue {
+                                            value: text
                                         }
-                                        pageInfo {
-                                            endCursor
-                                            hasNextPage
+                                    }
+                                    Due: fieldValueByName(name: "Due") {
+                                        ... on ProjectV2ItemFieldDateValue {
+                                            value: date
+                                        }
+                                    }
+                                    Status: fieldValueByName(name: "Status") {
+                                        ... on ProjectV2ItemFieldSingleSelectValue {
+                                            value: optionId
                                         }
                                     }
                                 }

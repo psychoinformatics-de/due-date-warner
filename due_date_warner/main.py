@@ -9,8 +9,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from python_graphql_client import GraphqlClient
 
-from .query_due import query_due, query_field_values, query_item_values, \
-    query_projects
+from .query_due import query_due, query_item_values, query_projects
 
 
 logger = logging.getLogger(__name__)
@@ -134,17 +133,16 @@ def get_all(initial_node: Dict,
         yield from node[element_key]["edges"]
 
 
-def process_item(client: GraphqlClient,
-                 max_days: int,
+def process_item(max_days: int,
                  item: Dict,
                  project_title: str,
                  project_url: str
                  ) -> Iterable:
 
     field_values = {
-        field["node"]["projectField"]["name"]: field["node"]["value"]
-        for field in get_all(item, client, query_field_values, "fieldValues")}
-
+        key: value['value'] if (isinstance(value, dict) and value) else value
+        for key, value in item.items()
+        if value is not None}
     if field_values.get("Status") == github_done_status:
         return
     if "Due" not in field_values:
@@ -159,7 +157,7 @@ def process_item(client: GraphqlClient,
     url = project_url
     if item["type"] in ("ISSUE", "PULL_REQUEST"):
         if item["content"] is not None:
-            url = item["content"]["url"]
+            url = item["content"]["value"]
         else:
             logger.warning(
                 f"can not read content of issue '{item['title']}' "
@@ -170,7 +168,7 @@ def process_item(client: GraphqlClient,
     else:
         url = project_url
 
-    yield due_date, project_title, item["title"], url, project_url
+    yield due_date, project_title, field_values["Title"], url, project_url
 
 
 def process_project(client: GraphqlClient,
@@ -185,7 +183,7 @@ def process_project(client: GraphqlClient,
     project = project_holder["node"]
     title, url = project["title"], project["url"]
     for item in get_all(project, client, query_item_values, "items"):
-        yield from process_item(client, max_days, item["node"], title, url)
+        yield from process_item(max_days, item["node"], title, url)
 
 
 def read_due_items(client: GraphqlClient,
@@ -195,7 +193,7 @@ def read_due_items(client: GraphqlClient,
 
     result = process_query(client, query_due, {"organizationName": organization})
     project_holder = result["data"]["organization"]
-    for project_next in get_all(project_holder, client, query_projects, "projectsNext"):
+    for project_next in get_all(project_holder, client, query_projects, "projectsV2"):
         yield from process_project(client, project_next, max_days)
 
 

@@ -91,7 +91,20 @@ query next_project($nodeId: ID!, $endCursor: String) {
             id
             projectsV2(first: 100, after: $endCursor) {
                 edges {
-                    %s
+                    node {
+                        id
+                        title
+                        url
+                        items(first:100) {
+                            edges {
+                                %s
+                            }
+                            pageInfo {
+                                endCursor
+                                hasNextPage
+                            }
+                        }
+                    }
                 }
                 pageInfo {
                     endCursor
